@@ -7,6 +7,13 @@
       <ResourceDictionary.MergedDictionaries>
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
       </ResourceDictionary.MergedDictionaries>
+      <!-- Chip-style filter radios (Library page). Implicit: applies to RadioButtons only;
+           the app uses no other RadioButtons, so scope is safe. -->
+      <Style x:Key="ChipRadioButtonStyle" TargetType="RadioButton">
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="Padding" Value="16,6" />
+        <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+      </Style>
     </ResourceDictionary>
   </Application.Resources>
 </Application>
