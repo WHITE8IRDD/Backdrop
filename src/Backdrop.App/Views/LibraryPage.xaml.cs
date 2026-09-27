@@ -196,6 +196,24 @@ public sealed partial class LibraryPage : Page
         }
     }
 
+    private async void OnApplyClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is Guid id)
+        {
+            var item = Vm.Items.FirstOrDefault(x => x.Id == id);
+            if (item is not null)
+            {
+                await Vm.ApplyAsync(item);
+                Bind();
+                return;
+            }
+        }
+        InfoBar.Title = "Apply failed";
+        InfoBar.Message = "Wallpaper not found in library - reload the page.";
+        InfoBar.Severity = InfoBarSeverity.Error;
+        InfoBar.IsOpen = true;
+    }
+
     private void OnDragOver(object sender, DragEventArgs e)
     {
         e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;

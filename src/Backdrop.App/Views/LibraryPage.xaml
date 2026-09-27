@@ -42,6 +42,8 @@
             </Border>
             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding Type}" Opacity="0.7" FontSize="12" />
+            <Button Content="Apply to Desktop" Tag="{Binding Id}" Click="OnApplyClick"
+                    Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
           </StackPanel>
         </DataTemplate>
       </GridView.ItemTemplate>

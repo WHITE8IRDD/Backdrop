@@ -72,9 +72,20 @@ public partial class LibraryViewModel : ObservableObject
         IsImporting = true;
         try
         {
+            int before = Items.Count;
             var r = await _import.ImportAsync(path);
-            InfoMessage = r.IsSuccess ? $"Imported “{r.Value!.Title}”." : $"Import failed: {r.Error}";
+            App.Trace($"ImportAsync result success={r.IsSuccess} err={r.Error} itemsBefore={before}");
+            if (!r.IsSuccess)
+            {
+                InfoMessage = $"Import failed: {r.Error}";
+                return;
+            }
             await RefreshAsync();
+            App.Trace($"ImportAsync after refresh: items={Items.Count} filter={Filter} sort={Sort}");
+            bool visible = Items.Any(x => x.Sha256 == r.Value!.Sha256);
+            InfoMessage = visible
+                ? $"Imported “{r.Value!.Title}” ({Items.Count} in library)."
+                : $"Imported “{r.Value!.Title}” but it is not listed — restart the app.";
         }
         finally { IsImporting = false; }
     }
