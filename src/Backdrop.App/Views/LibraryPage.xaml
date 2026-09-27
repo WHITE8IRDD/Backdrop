@@ -15,7 +15,7 @@
       <Button Content="Import" Style="{StaticResource AccentButtonStyle}" Click="Import_Click" />
     </StackPanel>
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-      <RadioButtons x:Name="FilterChips" SelectedIndex="0" SelectionChanged="Filter_Changed">
+      <RadioButtons x:Name="FilterChips" SelectedIndex="0" SelectionChanged="Filter_Changed" MaxColumns="4">
         <RadioButton Content="All" Style="{StaticResource ChipRadioButtonStyle}" />
         <RadioButton Content="Video" Style="{StaticResource ChipRadioButtonStyle}" />
         <RadioButton Content="GIF" Style="{StaticResource ChipRadioButtonStyle}" />
@@ -28,14 +28,17 @@
       </ComboBox>
     </StackPanel>
     <GridView Grid.Row="2" x:Name="Grid" SelectionMode="Single"
-              AllowDrop="True" DragOver="Grid_DragOver" DragLeave="Grid_DragLeave" Drop="Grid_Drop">
+              AllowDrop="True" DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
       <GridView.ItemTemplate>
         <DataTemplate>
           <StackPanel Width="320" Spacing="4" Padding="8">
             <Border CornerRadius="8" Height="180" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-              <TextBlock Text="&#xE714;" FontFamily="Segoe Fluent Icons" FontSize="32"
-                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Grid>
+                <TextBlock Text="&#xE714;" FontFamily="Segoe Fluent Icons" FontSize="32"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Image Source="{Binding ThumbnailPath}" Stretch="UniformToFill" />
+              </Grid>
             </Border>
             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding Type}" Opacity="0.7" FontSize="12" />
@@ -61,6 +64,6 @@
         <TextBlock Text="Drop to import" Style="{StaticResource TitleTextBlockStyle}" HorizontalAlignment="Center" />
       </StackPanel>
     </Border>
-    <InfoBar Grid.Row="3" x:Name="Info" IsOpen="False" Severity="Informational" />
+    <InfoBar Grid.Row="3" x:Name="InfoBar" IsOpen="False" Severity="Error" Message="" />
   </Grid>
 </Page>

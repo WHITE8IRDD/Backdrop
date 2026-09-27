@@ -21,7 +21,7 @@ public sealed partial class LibraryPage : Page
     private void Bind()
     {
         // SelectionChanged fires during InitializeComponent before fields exist.
-        if (Grid is null || Info is null || EmptyState is null)
+        if (Grid is null || InfoBar is null || EmptyState is null)
             return;
         var items = Vm.FilteredItems().ToList();
         Grid.ItemsSource = items;
@@ -29,8 +29,8 @@ public sealed partial class LibraryPage : Page
         EmptyState.Visibility = items.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         if (!string.IsNullOrEmpty(Vm.InfoMessage))
         {
-            Info.Message = Vm.InfoMessage;
-            Info.IsOpen = true;
+            InfoBar.Message = Vm.InfoMessage;
+            InfoBar.IsOpen = true;
         }
     }
 
@@ -57,18 +57,31 @@ public sealed partial class LibraryPage : Page
 
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
-        // FileOpenPicker can throw E_FAIL on machines with broken dialog plumbing
-        // (seen in the wild); drag-drop in the grid below always works as fallback.
+        InfoBar.IsOpen = false;
         try
         {
             var picker = new FileOpenPicker
             {
+                ViewMode = PickerViewMode.Thumbnail,
                 SuggestedStartLocation = PickerLocationId.VideosLibrary,
                 FileTypeFilter = { ".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v", ".gif", ".html", ".htm", ".zip" },
             };
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+            // Robust HWND: MainWindow handle first, XamlRoot fallback for unpackaged WinUI 3.
+            nint hwnd = 0;
+            var window = App.MainWindow;
+            if (window is not null)
+                hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            if (hwnd == 0 && XamlRoot is not null)
+            {
+                try { hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this); }
+                catch { /* keep 0, reported below */ }
+            }
+            App.Trace($"Picker HWND=0x{hwnd:X}, launching FileOpenPicker");
+            if (hwnd == 0)
+                throw new InvalidOperationException("HWND is 0 - MainWindow not initialized.");
             WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
             var file = await picker.PickSingleFileAsync();
+            App.Trace($"Picker returned {(file is null ? "null (cancelled)" : file.Path)}");
             if (file is not null)
             {
                 await Vm.ImportAsync(file.Path);
@@ -77,34 +90,55 @@ public sealed partial class LibraryPage : Page
         }
         catch (Exception ex)
         {
-            Vm.InfoMessage = $"Couldn't open the file picker ({ex.Message.Trim()}). You can drag & drop files instead.";
-            Info.Severity = InfoBarSeverity.Warning;
-            Info.Message = Vm.InfoMessage;
-            Info.IsOpen = true;
+            // ex.Message is empty for E_FAIL; HResult carries the diagnosis.
+            var msg = $"Picker failed 0x{ex.HResult:X8}: {ex.Message.Trim()} [{ex.GetType().Name}]";
+            App.Trace("Import_Click: " + msg);
+            Vm.InfoMessage = msg + " You can drag & drop files instead.";
+            InfoBar.Message = Vm.InfoMessage;
+            InfoBar.Severity = InfoBarSeverity.Error;
+            InfoBar.IsOpen = true;
+            System.Diagnostics.Debug.WriteLine(ex.ToString());
         }
     }
 
-    private void Grid_DragOver(object sender, DragEventArgs e)
+    private void OnDragOver(object sender, DragEventArgs e)
     {
         e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
-        e.DragUIOverride.Caption = "Drop to import";
+        e.DragUIOverride.Caption = "Import wallpaper";
+        e.DragUIOverride.IsCaptionVisible = true;
+        e.DragUIOverride.IsGlyphVisible = true;
         DragOverlay.Visibility = Visibility.Visible;
+        e.Handled = true;
     }
 
-    private void Grid_DragLeave(object sender, DragEventArgs e)
+    private void OnDragLeave(object sender, DragEventArgs e)
         => DragOverlay.Visibility = Visibility.Collapsed;
 
-    private async void Grid_Drop(object sender, DragEventArgs e)
+    private async void OnDrop(object sender, DragEventArgs e)
     {
         DragOverlay.Visibility = Visibility.Collapsed;
-        if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+        InfoBar.IsOpen = false;
+        try
         {
-            var items = await e.DataView.GetStorageItemsAsync();
-            foreach (var item in items)
+            if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
             {
-                await Vm.ImportAsync(item.Path);
+                var items = await e.DataView.GetStorageItemsAsync();
+                foreach (var item in items.OfType<Windows.Storage.StorageFile>())
+                {
+                    App.Trace($"Drop import {item.Path}");
+                    await Vm.ImportAsync(item.Path);
+                }
+                Bind();
             }
-            Bind();
         }
+        catch (Exception ex)
+        {
+            var msg = $"Import failed 0x{ex.HResult:X8}: {ex.Message.Trim()}";
+            App.Trace("OnDrop: " + msg);
+            InfoBar.Message = msg;
+            InfoBar.Severity = InfoBarSeverity.Error;
+            InfoBar.IsOpen = true;
+        }
+        e.Handled = true;
     }
 }
