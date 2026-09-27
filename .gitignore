@@ -1,0 +1,23 @@
+## Build output
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+.vs/
+TestResults/
+
+## MSIX / installer
+installer/*_Test/
+installer/*.msix
+installer/*.appinstaller
+*.cer
+*.pfx
+
+## Runtime (never commit)
+%AppData% is runtime-only; do not commit wallpapers.db, settings.json, thumbnails.
+
+## OS
+Thumbs.db
+Desktop.ini

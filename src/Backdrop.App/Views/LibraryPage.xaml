@@ -1,0 +1,47 @@
+<Page
+    x:Class="Backdrop.App.Views.LibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Padding="24" RowSpacing="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <AutoSuggestBox x:Name="Search" PlaceholderText="Search wallpapers" Width="280"
+                      TextChanged="Search_TextChanged" />
+      <Button Content="Import" Style="{StaticResource AccentButtonStyle}" Click="Import_Click" />
+    </StackPanel>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+      <RadioButtons x:Name="FilterChips" SelectedIndex="0" SelectionChanged="Filter_Changed">
+        <RadioButton Content="All" />
+        <RadioButton Content="Video" />
+        <RadioButton Content="GIF" />
+        <RadioButton Content="HTML" />
+      </RadioButtons>
+      <ComboBox x:Name="SortBox" SelectedIndex="0" SelectionChanged="Sort_Changed">
+        <ComboBoxItem Content="Last Used" />
+        <ComboBoxItem Content="Date Added" />
+        <ComboBoxItem Content="Name" />
+      </ComboBox>
+    </StackPanel>
+    <GridView Grid.Row="2" x:Name="Grid" SelectionMode="Single"
+              AllowDrop="True" DragOver="Grid_DragOver" Drop="Grid_Drop">
+      <GridView.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Width="320" Spacing="4" Padding="8">
+            <Border CornerRadius="8" Height="180" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <TextBlock Text="&#xE714;" FontFamily="Segoe Fluent Icons" FontSize="32"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Type}" Opacity="0.7" FontSize="12" />
+          </StackPanel>
+        </DataTemplate>
+      </GridView.ItemTemplate>
+    </GridView>
+    <InfoBar Grid.Row="3" x:Name="Info" IsOpen="False" Severity="Informational" />
+  </Grid>
+</Page>

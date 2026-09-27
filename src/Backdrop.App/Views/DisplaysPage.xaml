@@ -1,0 +1,24 @@
+<Page
+    x:Class="Backdrop.App.Views.DisplaysPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel Padding="24" Spacing="12">
+    <TextBlock Text="Displays" FontSize="24" FontWeight="SemiBold" />
+    <TextBlock Text="Assign a wallpaper per monitor, or span one across all." Opacity="0.7" />
+    <ToggleSwitch x:Name="SpanToggle" Header="Span across monitors" Toggled="Span_Toggled" />
+    <ListView x:Name="MonitorList">
+      <ListView.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Spacing="4" Padding="8">
+            <TextBlock Text="{Binding DeviceId}" FontWeight="SemiBold" />
+            <TextBlock FontSize="12" Opacity="0.7">
+              <Run Text="{Binding Bounds.Width}" /><Run Text="×" /><Run Text="{Binding Bounds.Height}" />
+              <Run Text="  •  " /><Run Text="{Binding FriendlyName}" />
+            </TextBlock>
+          </StackPanel>
+        </DataTemplate>
+      </ListView.ItemTemplate>
+    </ListView>
+    <InfoBar x:Name="Info" IsOpen="False" Severity="Informational" />
+  </StackPanel>
+</Page>

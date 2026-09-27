@@ -1,0 +1,71 @@
+<!-- Backdrop.App-local build overrides (WinUI unpackaged, CLI-only environments).
+
+     MrtCore's CopyLocalFilesOutputGroup calls the RemovePayloadDuplicates task from
+     Microsoft.Build.AppxPackage.dll, which only ships with the VS AppX workload.
+     This override keeps the exact item logic (incl. WINMD implementation mapping)
+     but skips the VS-only dedup step. Duplicates in copy-local are benign (last wins).
+     Evaluated after NuGet buildTransitive imports, so this definition wins. -->
+<Project>
+  <!-- CLI-only environments lack the VS AppX/MSIX build tasks entirely
+       (Microsoft.Build.AppxPackage.dll / Pri.Tasks.dll). For unpackaged
+       `dotnet build`, skip the MRT packaging chain: PRI resources resolve
+       from the installed WindowsAppRuntime at runtime. MSIX packaging
+       (installer/) still runs on CI with full VS tooling. -->
+  <PropertyGroup>
+    <_PrepareMsixPackage>false</_PrepareMsixPackage>
+    <!-- Rebuild without MRT packaging (single line: no whitespace-split issues).
+         VS/MSIX flows can restore packaging with -p:_PrepareMsixPackage=true. -->
+    <PrepareForRunDependsOn>CopyFilesToOutputDirectory</PrepareForRunDependsOn>
+  </PropertyGroup>
+
+  <Target Name="CopyLocalFilesOutputGroup"
+          DependsOnTargets="$(CopyLocalFilesOutputGroupDependsOn)"
+          Returns="@(CopyLocalFilesOutputGroupOutput)">
+
+    <ItemGroup>
+      <_CopyLocalFilesOutputGroupOutputFromReferences Include="@(ReferenceCopyLocalPaths)"
+                                       Condition="'%(ReferenceCopyLocalPaths.Extension)' != '.xml' or '$(AppxCopyLocalFilesOutputGroupIncludeXmlFiles)' == 'true'">
+        <TargetPath>%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</TargetPath>
+      </_CopyLocalFilesOutputGroupOutputFromReferences>
+    </ItemGroup>
+
+    <!-- No RemovePayloadDuplicates (VS-only task): pass through directly. -->
+    <ItemGroup>
+      <CopyLocalFilesOutputGroupOutput Include="@(_CopyLocalFilesOutputGroupOutputFromReferences)" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_WinmdWithImplementation
+          Include="@(CopyLocalFilesOutputGroupOutput)"
+          Condition="'%(CopyLocalFilesOutputGroupOutput.Extension)' == '.winmd'
+                       AND '%(CopyLocalFilesOutputGroupOutput.Filename)' != 'platform'
+                       AND '%(CopyLocalFilesOutputGroupOutput.Implementation)' != ''" />
+
+      <_WinmdWithImplementationTargetPath Include="@(_WinmdWithImplementation->'%(DestinationSubDirectory)%(Implementation)')">
+        <OriginalItemSpec>%(Identity)</OriginalItemSpec>
+      </_WinmdWithImplementationTargetPath>
+      <_CopyLocalFilesOutputGroupOutputTargetPath Include="@(CopyLocalFilesOutputGroupOutput->'%(TargetPath)')"/>
+      <_WinmdSatifiedImplementation Include="@(_WinmdWithImplementationTargetPath)"
+                                  Condition="'@(_WinmdWithImplementationTargetPath)' == '@(_CopyLocalFilesOutputGroupOutputTargetPath)' AND '%(Identity)' != ''"/>
+      <_WinmdWithImplementation Remove="@(_WinmdSatifiedImplementation->'%(OriginalItemSpec)')" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <CopyLocalFilesOutputGroupOutput Include="%(_WinmdWithImplementation.RootDir)%(_WinmdWithImplementation.Directory)%(_WinmdWithImplementation.Implementation)"
+                                       Condition="Exists('%(_WinmdWithImplementation.RootDir)%(_WinmdWithImplementation.Directory)%(_WinmdWithImplementation.Implementation)')">
+        <TargetPath>%(_WinmdWithImplementation.DestinationSubDirectory)%(_WinmdWithImplementation.Implementation)</TargetPath>
+      </CopyLocalFilesOutputGroupOutput>
+    </ItemGroup>
+
+  </Target>
+
+  <!-- Page XBFs normally deploy via the VS-only PRI pipeline (disabled above).
+       Copy them explicitly so all pages load in unpackaged output. -->
+  <Target Name="BackdropCopyXbfToOutput" AfterTargets="Build">
+    <ItemGroup>
+      <_BackdropXbf Include="$(IntermediateOutputPath)**\*.xbf" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_BackdropXbf)" DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

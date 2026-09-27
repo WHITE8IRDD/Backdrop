@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Unpackaged WinUI 3 (Inno fallback path). MSIX packaging is done in installer/ via MakeAppx. -->
+    <!-- Pin a single RID: WinAppSDK 1.5 advertises win10-*-aot RIDs unknown to .NET 8 SDK (NETSDK1083). -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <Platforms>x64</Platforms>
+    <!-- CLI-only builds lack VS AppxPackage tools (ExpandPriContent). Unpackaged output
+         resolves PRI resources from the installed WindowsAppRuntime; VS/MSIX flows can
+         re-enable with -p:AppxGeneratePriEnabled=true. -->
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.0.240109" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.1.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Backdrop.Core\Backdrop.Core.csproj" />
+    <ProjectReference Include="..\Backdrop.DesktopInterop\Backdrop.DesktopInterop.csproj" />
+    <ProjectReference Include="..\Backdrop.Infrastructure\Backdrop.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

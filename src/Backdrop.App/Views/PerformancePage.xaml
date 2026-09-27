@@ -1,0 +1,23 @@
+<Page
+    x:Class="Backdrop.App.Views.PerformancePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel Padding="24" Spacing="8" MaxWidth="640" HorizontalAlignment="Left">
+    <TextBlock Text="Performance" FontSize="24" FontWeight="SemiBold" />
+    <TextBlock Text="Wallpapers pause automatically to preserve battery and foreground performance."
+               Opacity="0.7" TextWrapping="Wrap" />
+    <ToggleSwitch x:Name="TFullscreen" Header="Pause on fullscreen app or game" />
+    <ToggleSwitch x:Name="TMaximized" Header="Pause when a window is maximized (optional)" />
+    <ToggleSwitch x:Name="TBattery" Header="Pause on Battery Saver" />
+    <ToggleSwitch x:Name="TRdp" Header="Pause during Remote Desktop" />
+    <ToggleSwitch x:Name="TLock" Header="Pause on lock screen" />
+    <ToggleSwitch x:Name="TDisplay" Header="Pause when display is off" />
+    <ComboBox x:Name="FpsBox" Header="FPS limit">
+      <ComboBoxItem Content="30" />
+      <ComboBoxItem Content="60" />
+      <ComboBoxItem Content="Unlimited" />
+    </ComboBox>
+    <Button Content="Save" Style="{StaticResource AccentButtonStyle}" Click="Save_Click" />
+    <InfoBar x:Name="Info" IsOpen="False" Severity="Success" Message="Saved." />
+  </StackPanel>
+</Page>

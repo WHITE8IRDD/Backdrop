@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backdrop MSIX manifest (INSTALLER.md §2). Capabilities: runFullTrust + internetClient. -->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10">
+  <Identity Name="YourCompany.Backdrop" Publisher="CN=Backdrop" Version="1.0.0.0" />
+  <Properties>
+    <DisplayName>Backdrop</DisplayName>
+    <PublisherDisplayName>Backdrop</PublisherDisplayName>
+    <Description>Lightweight, native live wallpapers for Windows 11.</Description>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+    <PackageDependency Name="Microsoft.WindowsAppRuntime.1.5" MinVersion="5001.0.0.0" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+  <Applications>
+    <Application Id="Backdrop" Executable="Backdrop.App\Backdrop.App.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Backdrop" Description="Live wallpapers"
+                          BackgroundColor="transparent" Square150x150Logo="Assets\Logo.png" Square44x44Logo="Assets\Logo.png" />
+      <Extensions>
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="Backdrop.App\Backdrop.App.exe" />
+        <desktop:Extension Category="windows.startupTask" Executable="Backdrop.App\Backdrop.App.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="Startup" Enabled="false" DisplayName="Backdrop" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <Capability Name="internetClient" />
+  </Capabilities>
+</Package>
