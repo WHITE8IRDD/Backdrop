@@ -33,5 +33,7 @@
     <ProjectReference Include="..\Backdrop.Core\Backdrop.Core.csproj" />
     <ProjectReference Include="..\Backdrop.DesktopInterop\Backdrop.DesktopInterop.csproj" />
     <ProjectReference Include="..\Backdrop.Infrastructure\Backdrop.Infrastructure.csproj" />
+    <!-- Build-order only: host deploys via the CopyWallpaperHost target (no assembly ref). -->
+    <ProjectReference Include="..\Backdrop.WallpaperHost\Backdrop.WallpaperHost.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

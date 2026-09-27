@@ -87,7 +87,7 @@ public partial class App : Application
                 services.AddSingleton<IWallpaperEngine>(sp => new WallpaperEngineService(
                     sp.GetRequiredService<IMonitorService>(),
                     sp.GetRequiredService<IDesktopIntegration>(),
-                    () => Path.Combine(AppContext.BaseDirectory, "Backdrop.WallpaperHost.exe"),
+                    () => WallpaperEngineService.ResolveHostExePath(),
                     sp.GetService<ILogger<WallpaperEngineService>>()));
                 services.AddSingleton<IPerformanceManager>(sp => new PerformanceManager(
                     sp.GetRequiredService<Func<BackdropSettings>>(),

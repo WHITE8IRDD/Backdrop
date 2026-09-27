@@ -17,6 +17,8 @@ public partial class LibraryViewModel : ObservableObject
     private readonly IWallpaperEngine _engine;
     private readonly IMonitorService _monitors;
     private readonly JsonSettingsService<BackdropSettings> _settings;
+    private readonly IThumbnailService _thumbs;
+    private bool _backfilling;
 
     [ObservableProperty] private LibraryFilter filter = LibraryFilter.All;
     [ObservableProperty] private LibrarySort sort = LibrarySort.LastUsed;
@@ -29,13 +31,14 @@ public partial class LibraryViewModel : ObservableObject
 
     public LibraryViewModel(IWallpaperCatalog catalog, IImportService import,
         IWallpaperEngine engine, IMonitorService monitors,
-        JsonSettingsService<BackdropSettings> settings)
+        JsonSettingsService<BackdropSettings> settings, IThumbnailService thumbs)
     {
         _catalog = catalog;
         _import = import;
         _engine = engine;
         _monitors = monitors;
         _settings = settings;
+        _thumbs = thumbs;
     }
 
     public IEnumerable<WallpaperRecord> FilteredItems()
@@ -64,6 +67,44 @@ public partial class LibraryViewModel : ObservableObject
     {
         Items = (await _catalog.ListAsync()).ToList();
         OnPropertyChanged(nameof(FilteredItems));
+        // Heal rows imported before real thumbnails existed (tiny/missing thumb files).
+        if (!_backfilling && Items.Any(NeedsThumbnail))
+        {
+            _backfilling = true;
+            try { await BackfillThumbnailsAsync(); } finally { _backfilling = false; }
+        }
+    }
+
+    private static bool NeedsThumbnail(WallpaperRecord w)
+    {
+        if (w.Type is not (WallpaperType.Video or WallpaperType.Gif))
+            return false;
+        try
+        {
+            return string.IsNullOrEmpty(w.ThumbnailPath)
+                || !File.Exists(w.ThumbnailPath)
+                || new FileInfo(w.ThumbnailPath).Length < 4096;
+        }
+        catch { return true; }
+    }
+
+    private async Task BackfillThumbnailsAsync()
+    {
+        bool changed = false;
+        foreach (var w in Items.Where(NeedsThumbnail).ToList())
+        {
+            var t = await _thumbs.GenerateAsync(w);
+            if (t.IsSuccess && !string.IsNullOrEmpty(t.Value))
+            {
+                await _catalog.UpdateAsync(w with { ThumbnailPath = t.Value! });
+                changed = true;
+            }
+        }
+        if (changed)
+        {
+            Items = (await _catalog.ListAsync()).ToList();
+            OnPropertyChanged(nameof(FilteredItems));
+        }
     }
 
     [RelayCommand]

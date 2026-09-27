@@ -79,6 +79,7 @@ public interface IWallpaperCatalog
     Task<IReadOnlyList<WallpaperRecord>> ListAsync(CancellationToken ct = default);
     Task<Result> RemoveAsync(Guid id, CancellationToken ct = default);
     Task<Result> TouchUsedAsync(Guid id, CancellationToken ct = default);
+    Task<Result> UpdateAsync(WallpaperRecord record, CancellationToken ct = default);
 }
 
 public interface IImportService

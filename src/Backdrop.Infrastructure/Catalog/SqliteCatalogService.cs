@@ -108,4 +108,24 @@ public sealed class SqliteCatalogService : IWallpaperCatalog
             return Result.Fail(ex.Message);
         }
     }
+
+    public async Task<Result> UpdateAsync(WallpaperRecord record, CancellationToken ct = default)
+    {
+        try
+        {
+            using var ctx = Open();
+            var e = await ctx.Wallpapers.FindAsync([record.Id], ct);
+            if (e is null)
+                return Result.Fail("Not found.");
+            var updated = WallpaperEntity.FromRecord(record);
+            ctx.Entry(e).CurrentValues.SetValues(updated);
+            e.Id = record.Id; // keep key stable even if SetValues touched it
+            await ctx.SaveChangesAsync(ct);
+            return Result.Ok();
+        }
+        catch (Exception ex)
+        {
+            return Result.Fail(ex.Message);
+        }
+    }
 }

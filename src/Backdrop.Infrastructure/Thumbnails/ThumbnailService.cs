@@ -1,29 +1,61 @@
 // Backdrop.Infrastructure — thumbnail service (ARCHITECTURE.md §3).
-// V1: copies a lightweight placeholder scheme — real offscreen MF seek-to-15%
-// rendering happens in WallpaperHost (has MediaPlayer); this path guarantees
-// Library grid never breaks headless and is fully testable.
+// Real frame capture via the shell thumbnail provider (StorageFile.GetThumbnailAsync):
+// no MediaFoundation needed in this process, works unpackaged, fully async.
+// Falls back to a 1x1 placeholder so the grid never breaks; import never fails.
 using Backdrop.Core;
+using Windows.Storage;
+using Windows.Storage.FileProperties;
 
 namespace Backdrop.Infrastructure.Thumbnails;
 
 public sealed class ThumbnailService : IThumbnailService
 {
-    public Task<Result<string>> GenerateAsync(WallpaperRecord wall, CancellationToken ct = default)
+    private const uint RequestedSize = 400;
+    private const long RealThumbMinBytes = 4096; // below this we treat a cached file as placeholder
+
+    public async Task<Result<string>> GenerateAsync(WallpaperRecord wall, CancellationToken ct = default)
     {
         try
         {
             BackdropPaths.EnsureCreated();
             var dest = Path.Combine(BackdropPaths.ThumbnailCacheDir, wall.Sha256 + ".jpg");
-            if (File.Exists(dest))
-                return Task.FromResult(Result<string>.Ok(dest));
+            var existing = new FileInfo(dest);
+            if (existing.Exists && existing.Length >= RealThumbMinBytes)
+                return Result<string>.Ok(dest);
+
+            if (wall.Type is WallpaperType.Video or WallpaperType.Gif)
+            {
+                try
+                {
+                    var file = await StorageFile.GetFileFromPathAsync(wall.LibraryPath);
+                    var mode = wall.Type == WallpaperType.Gif
+                        ? ThumbnailMode.PicturesView
+                        : ThumbnailMode.VideosView;
+                    using var thumb = await file.GetThumbnailAsync(mode, RequestedSize);
+                    if (thumb is not null && thumb.Size > 0)
+                    {
+                        using var reader = new Windows.Storage.Streams.DataReader(thumb);
+                        await reader.LoadAsync((uint)thumb.Size);
+                        byte[] buf = new byte[thumb.Size];
+                        reader.ReadBytes(buf);
+                        await File.WriteAllBytesAsync(dest, buf, ct);
+                        if (new FileInfo(dest).Length > 0)
+                            return Result<string>.Ok(dest);
+                    }
+                }
+                catch
+                {
+                    // Fall through to placeholder.
+                }
+            }
+
             // Minimal valid JPEG (1x1) placeholder so grid always has an image.
-            // Host replaces it with a real frame capture when MF is available.
-            File.WriteAllBytes(dest, PlaceholderJpeg);
-            return Task.FromResult(Result<string>.Ok(dest));
+            await File.WriteAllBytesAsync(dest, PlaceholderJpeg, ct);
+            return Result<string>.Ok(dest);
         }
         catch (Exception ex)
         {
-            return Task.FromResult(Result<string>.Fail(ex.Message));
+            return Result<string>.Fail(ex.Message);
         }
     }
 

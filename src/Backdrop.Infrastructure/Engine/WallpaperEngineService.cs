@@ -21,6 +21,33 @@ public sealed class WallpaperEngineService : IWallpaperEngine, IDisposable
 
     private sealed record HostHandle(Process Process, WallpaperRecord Wall, SpawnMode Mode);
 
+    /// <summary>Locate Backdrop.WallpaperHost.exe across publish, dev, and installed layouts.
+    /// Dev base (bin\Release\TFM\win-x64) is 5 levels below src\Backdrop.App, hence the depth.</summary>
+    public static string ResolveHostExePath()
+    {
+        string @base = AppContext.BaseDirectory;
+        var candidates = new[]
+        {
+            // 1. Same folder as the app (publish / MSIX / self-contained layout).
+            Path.Combine(@base, "Backdrop.WallpaperHost.exe"),
+            // 2. Dev builds: sibling project output (Release/Debug, with/without RID folder).
+            Path.GetFullPath(Path.Combine(@base, @"..\..\..\..\..\Backdrop.WallpaperHost\bin\Release\net8.0-windows10.0.22621.0\win-x64\Backdrop.WallpaperHost.exe")),
+            Path.GetFullPath(Path.Combine(@base, @"..\..\..\..\..\Backdrop.WallpaperHost\bin\Debug\net8.0-windows10.0.22621.0\win-x64\Backdrop.WallpaperHost.exe")),
+            Path.GetFullPath(Path.Combine(@base, @"..\..\..\..\..\Backdrop.WallpaperHost\bin\Release\net8.0-windows10.0.22621.0\Backdrop.WallpaperHost.exe")),
+            Path.GetFullPath(Path.Combine(@base, @"..\..\..\..\..\Backdrop.WallpaperHost\bin\Debug\net8.0-windows10.0.22621.0\Backdrop.WallpaperHost.exe")),
+            // 3. Per-user install layout.
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Backdrop", "Backdrop.WallpaperHost.exe"),
+        };
+        foreach (var p in candidates)
+        {
+            if (File.Exists(p))
+                return p;
+        }
+        throw new FileNotFoundException(
+            "Backdrop.WallpaperHost.exe not found. Probed:" + Environment.NewLine +
+            string.Join(Environment.NewLine, candidates));
+    }
+
     public WallpaperEngineService(IMonitorService monitors, IDesktopIntegration desktop,
         Func<string> hostExePath, ILogger<WallpaperEngineService>? log = null)
     {
@@ -115,7 +142,11 @@ public sealed class WallpaperEngineService : IWallpaperEngine, IDisposable
         {
             var exe = _hostExePath();
             if (!File.Exists(exe))
-                return Result.Fail($"Host exe not found: {exe}");
+            {
+                // Fall back to the multi-layout resolver (dev vs publish outputs).
+                try { exe = ResolveHostExePath(); }
+                catch (Exception rex) { return Result.Fail(rex.Message); }
+            }
             var psi = new ProcessStartInfo(exe,
                 $"--monitor \"{monitor}\" --wallpaper-id {wall.Id:N} --library-path \"{wall.LibraryPath}\" --type {wall.Type}")
             {
