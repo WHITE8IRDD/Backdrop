@@ -87,6 +87,12 @@ public sealed partial class LibraryPage : Page
     [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
     private static extern bool GetOpenFileNameW(ref OpenFileNameW ofn);
 
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern nint GetActiveWindow();
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern nint GetForegroundWindow();
+
     private static nint ResolveHwnd(Page page)
     {
         nint hwnd = 0;
@@ -100,7 +106,15 @@ public sealed partial class LibraryPage : Page
         if (hwnd == 0 && page.XamlRoot is not null)
         {
             try { hwnd = WinRT.Interop.WindowNative.GetWindowHandle(page); }
-            catch { /* keep 0, caller reports */ }
+            catch { /* keep 0, try active/foreground */ }
+        }
+        if (hwnd == 0)
+        {
+            try { hwnd = GetActiveWindow(); } catch { }
+            if (hwnd == 0)
+            {
+                try { hwnd = GetForegroundWindow(); } catch { }
+            }
         }
         return hwnd;
     }
@@ -170,6 +184,7 @@ public sealed partial class LibraryPage : Page
             }
             catch (Exception ex)
             {
+                InfoBar.Title = "Import failed";
                 InfoBar.Message = $"Import failed 0x{ex.HResult:X8}: {ex.Message}";
                 InfoBar.Severity = InfoBarSeverity.Error;
                 InfoBar.IsOpen = true;
@@ -215,6 +230,7 @@ public sealed partial class LibraryPage : Page
         {
             var msg = $"Drop failed 0x{ex.HResult:X8}: {ex.Message.Trim()} | {ex.GetType().Name}";
             App.Trace("OnDrop: " + msg);
+            InfoBar.Title = "Import failed";
             InfoBar.Message = msg + " - check Logs";
             InfoBar.Severity = InfoBarSeverity.Error;
             InfoBar.IsOpen = true;
