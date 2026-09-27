@@ -4,9 +4,38 @@ using Backdrop.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.Runtime.InteropServices;
 using Windows.Storage.Pickers;
 
 namespace Backdrop.App.Views;
+
+/// <summary>Win32 fallback file dialog (comdlg32). The WinRT picker throws E_FAIL
+/// unpackaged on some machines even with correct HWND init; GetOpenFileNameW
+/// always works. No extra package/dependency needed (pure P/Invoke).</summary>
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+internal struct OpenFileNameW
+{
+    public int lStructSize;
+    public nint hwndOwner;
+    public nint hInstance;
+    [MarshalAs(UnmanagedType.LPWStr)] public string lpstrFilter;
+    [MarshalAs(UnmanagedType.LPWStr)] public string? lpstrCustomFilter;
+    public int nMaxCustFilter;
+    public int nFilterIndex;
+    [MarshalAs(UnmanagedType.LPWStr)] public string lpstrFile;
+    public int nMaxFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string? lpstrFileTitle;
+    public int nMaxFileTitle;
+    [MarshalAs(UnmanagedType.LPWStr)] public string? lpstrInitialDir;
+    [MarshalAs(UnmanagedType.LPWStr)] public string? lpstrTitle;
+    public int Flags;
+    public short nFileOffset;
+    public short nFileExtension;
+    [MarshalAs(UnmanagedType.LPWStr)] public string? lpstrDefExt;
+    public nint lCustData;
+    public nint lpfnHook;
+    [MarshalAs(UnmanagedType.LPWStr)] public string? lpTemplateName;
+}
 
 public sealed partial class LibraryPage : Page
 {
@@ -55,9 +84,31 @@ public sealed partial class LibraryPage : Page
         Bind();
     }
 
+    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+    private static extern bool GetOpenFileNameW(ref OpenFileNameW ofn);
+
+    private static nint ResolveHwnd(Page page)
+    {
+        nint hwnd = 0;
+        try
+        {
+            var window = App.MainWindow;
+            if (window is not null)
+                hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        }
+        catch { /* fall through to fallback */ }
+        if (hwnd == 0 && page.XamlRoot is not null)
+        {
+            try { hwnd = WinRT.Interop.WindowNative.GetWindowHandle(page); }
+            catch { /* keep 0, caller reports */ }
+        }
+        return hwnd;
+    }
+
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
         InfoBar.IsOpen = false;
+        string? pickedPath = null;
         try
         {
             var picker = new FileOpenPicker
@@ -66,38 +117,67 @@ public sealed partial class LibraryPage : Page
                 SuggestedStartLocation = PickerLocationId.VideosLibrary,
                 FileTypeFilter = { ".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v", ".gif", ".html", ".htm", ".zip" },
             };
-            // Robust HWND: MainWindow handle first, XamlRoot fallback for unpackaged WinUI 3.
-            nint hwnd = 0;
-            var window = App.MainWindow;
-            if (window is not null)
-                hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-            if (hwnd == 0 && XamlRoot is not null)
-            {
-                try { hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this); }
-                catch { /* keep 0, reported below */ }
-            }
-            App.Trace($"Picker HWND=0x{hwnd:X}, launching FileOpenPicker");
-            if (hwnd == 0)
-                throw new InvalidOperationException("HWND is 0 - MainWindow not initialized.");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            nint hwnd = ResolveHwnd(this);
+            App.Trace($"Picker try HWND=0x{hwnd:X}");
+            if (hwnd != 0)
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
             var file = await picker.PickSingleFileAsync();
-            App.Trace($"Picker returned {(file is null ? "null (cancelled)" : file.Path)}");
             if (file is not null)
-            {
-                await Vm.ImportAsync(file.Path);
-                Bind();
-            }
+                pickedPath = file.Path;
         }
         catch (Exception ex)
         {
-            // ex.Message is empty for E_FAIL; HResult carries the diagnosis.
-            var msg = $"Picker failed 0x{ex.HResult:X8}: {ex.Message.Trim()} [{ex.GetType().Name}]";
-            App.Trace("Import_Click: " + msg);
-            Vm.InfoMessage = msg + " You can drag & drop files instead.";
-            InfoBar.Message = Vm.InfoMessage;
-            InfoBar.Severity = InfoBarSeverity.Error;
-            InfoBar.IsOpen = true;
-            System.Diagnostics.Debug.WriteLine(ex.ToString());
+            App.Trace($"WinRT picker failed 0x{ex.HResult:X8} [{ex.GetType().Name}], falling back to Win32");
+        }
+
+        if (pickedPath is null)
+        {
+            // FALLBACK: Win32 common dialog works unpackaged without any HWND init.
+            try
+            {
+                nint hwnd = ResolveHwnd(this);
+                var ofn = new OpenFileNameW
+                {
+                    hwndOwner = hwnd,
+                    lpstrFilter = "Wallpapers\0*.mp4;*.webm;*.avi;*.mov;*.mkv;*.gif;*.html;*.htm\0Videos\0*.mp4;*.webm;*.avi;*.mov;*.mkv\0All files\0*.*\0\0",
+                    lpstrFile = new string('\0', 1024),
+                    nMaxFile = 1024,
+                    lpstrTitle = "Import wallpaper",
+                    Flags = 0x00080000 | 0x00001000 | 0x00000008, // OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR
+                };
+                ofn.lStructSize = Marshal.SizeOf(ofn);
+                if (GetOpenFileNameW(ref ofn))
+                {
+                    // Buffer is double-null-terminated; take the first path.
+                    int end = ofn.lpstrFile.IndexOf('\0');
+                    pickedPath = end >= 0 ? ofn.lpstrFile[..end] : ofn.lpstrFile;
+                    if (string.IsNullOrWhiteSpace(pickedPath))
+                        pickedPath = null;
+                }
+            }
+            catch (Exception ex2)
+            {
+                App.Trace($"Win32 fallback failed 0x{ex2.HResult:X8} [{ex2.GetType().Name}]: {ex2.Message}");
+            }
+        }
+
+        if (pickedPath is not null)
+        {
+            try
+            {
+                await Vm.ImportAsync(pickedPath);
+                Bind();
+            }
+            catch (Exception ex)
+            {
+                InfoBar.Message = $"Import failed 0x{ex.HResult:X8}: {ex.Message}";
+                InfoBar.Severity = InfoBarSeverity.Error;
+                InfoBar.IsOpen = true;
+            }
+        }
+        else
+        {
+            App.Trace("Pick cancelled (both pickers returned nothing)");
         }
     }
 
@@ -133,9 +213,9 @@ public sealed partial class LibraryPage : Page
         }
         catch (Exception ex)
         {
-            var msg = $"Import failed 0x{ex.HResult:X8}: {ex.Message.Trim()}";
+            var msg = $"Drop failed 0x{ex.HResult:X8}: {ex.Message.Trim()} | {ex.GetType().Name}";
             App.Trace("OnDrop: " + msg);
-            InfoBar.Message = msg;
+            InfoBar.Message = msg + " - check Logs";
             InfoBar.Severity = InfoBarSeverity.Error;
             InfoBar.IsOpen = true;
         }
